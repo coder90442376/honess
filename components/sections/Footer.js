@@ -291,8 +291,6 @@ export default function Footer() {
           <Column>
             <ColumnTitle>Contact Us</ColumnTitle>
             <p style={{ opacity: 0.7, fontSize: '0.9rem', lineHeight: '1.8', color: 'rgba(255, 255, 255, 0.7)' }}>
-              📧 jbowser727@gmail.com<br />
-              📞 (209) 622-9391<br />
               🌐 honestneed.com<br />
               <span style={{ fontSize: '0.8rem', opacity: 0.6 }}>
                 Responses within 24–48 business hours
