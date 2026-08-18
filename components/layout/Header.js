@@ -787,7 +787,7 @@ export default function Header() {
             </LiveBadge>
 
             <SecondaryBtn
-              href="/sponsorships"
+              href="/campaigns"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.97 }}
             >

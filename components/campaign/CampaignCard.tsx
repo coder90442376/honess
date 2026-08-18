@@ -62,7 +62,7 @@ const Card = styled.article`
   /* Horizontal layout once there's room for an image beside the body. */
   @media (min-width: 1024px) {
     flex-direction: row;
-    min-height: 230px;
+    height: 230px;
   }
 `
 
