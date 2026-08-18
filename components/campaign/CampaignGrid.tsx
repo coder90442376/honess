@@ -24,7 +24,7 @@ const Grid = styled.div`
     gap: 16px;
   }
 
-  /* 2 columns of wide horizontal cards on desktop */
+  /* 2 columns of stacked cards on desktop */
   @media (min-width: 1024px) {
     grid-template-columns: repeat(2, 1fr);
     gap: 20px;
@@ -62,11 +62,6 @@ const SkeletonCard = styled.div`
   display: flex;
   flex-direction: column;
   height: 330px;
-
-  @media (min-width: 1024px) {
-    flex-direction: row;
-    height: 230px;
-  }
 `
 
 const SkeletonImage = styled.div`
@@ -76,12 +71,6 @@ const SkeletonImage = styled.div`
   background: linear-gradient(90deg, ${tk.canvasDeep} 25%, ${tk.border} 50%, ${tk.canvasDeep} 75%);
   background-size: 400px 100%;
   animation: ${shimmer} 1.4s ease infinite;
-
-  @media (min-width: 1024px) {
-    width: 42%;
-    max-width: 260px;
-    height: 100%;
-  }
 `
 
 const SkeletonBody = styled.div`

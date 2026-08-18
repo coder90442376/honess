@@ -38,8 +38,7 @@ const fadeUp = keyframes`
 `
 
 // ─── Card Shell ───────────────────────────────────────────────────────────────
-// Horizontal layout with a fixed height so every card is the same size,
-// regardless of how much content it holds.
+// Keep the image above the campaign details at every viewport size.
 const Card = styled.article`
   background: ${tk.white};
   border-radius: 14px;
@@ -49,7 +48,6 @@ const Card = styled.article`
   transition: transform 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
   animation: ${fadeUp} 350ms ease both;
   display: flex;
-  /* Vertical (stacked) by default so two cards still fit per row on mobile. */
   flex-direction: column;
   min-height: 330px;
 
@@ -57,12 +55,6 @@ const Card = styled.article`
     transform: translateY(-3px);
     box-shadow: 0 12px 32px rgba(26, 95, 168, 0.12);
     border-color: ${tk.blue};
-  }
-
-  /* Horizontal layout once there's room for an image beside the body. */
-  @media (min-width: 1024px) {
-    flex-direction: row;
-    height: 230px;
   }
 `
 
@@ -81,12 +73,6 @@ const ImageWrap = styled.div`
 
   ${Card}:hover & img {
     transform: scale(1.04);
-  }
-
-  @media (min-width: 1024px) {
-    width: 42%;
-    max-width: 260px;
-    height: 100%;
   }
 `
 
