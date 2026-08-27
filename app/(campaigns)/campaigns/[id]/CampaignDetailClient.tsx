@@ -81,6 +81,9 @@ import Button from '@/components/ui/Button'
 import { BoostModal } from '@/components/boost'
 import { useGetCampaignBoost } from '@/api/hooks/useBoosts'
 import { useAuthStore } from '@/store/authStore'
+import UpgradeToShareCard from '@/features/campaigns/upgrade/UpgradeToShareCard'
+import BoostButton from '@/features/campaigns/boost/BoostButton'
+import SponsorUpgradeRequest from '@/features/campaigns/upgrade/SponsorUpgradeRequest'
 
 // ─── Animations ────────────────────────────────────────────────────────────────
 
@@ -1537,6 +1540,30 @@ export default function CampaignDetailClient() {
                   </ShareBtn>
                 </ShareGrid>
               </>
+            )}
+
+            {/* Community boost — supporters amplifying someone else's campaign.
+                Distinct from the creator's paid "Promote" boost under /boosts. */}
+            {!isCreator && campaignId && (
+              <div style={{ marginTop: '1rem' }}>
+                <BoostButton campaignId={String(campaignId)} source="campaign_page" />
+              </div>
+            )}
+
+            {/* Qualified supporters (donors / verified sharers) can ASK the
+                creator to add share rewards. Renders nothing for anyone else. */}
+            {!isCreator && campaignId && (
+              <div style={{ marginTop: '1rem' }}>
+                <SponsorUpgradeRequest campaignId={String(campaignId)} />
+              </div>
+            )}
+
+            {/* Free Campaign → Share Campaign upgrade (owner only; the card
+                renders nothing for anyone else). */}
+            {isCreator && campaignId && (
+              <div style={{ marginTop: '1rem' }}>
+                <UpgradeToShareCard campaignId={String(campaignId)} />
+              </div>
             )}
 
             {/* MS-08: Sponsor / supporter → campaign owner messaging */}

@@ -5,6 +5,7 @@ import styled from 'styled-components'
 import Link from 'next/link'
 import { ArrowUpRight, Image as ImageIcon } from 'lucide-react'
 import { useCampaign } from '@/api/hooks/useCampaigns'
+import BoostButton from '@/features/campaigns/boost/BoostButton'
 import type { RecommendationItem } from '@/types/ai'
 import { Chip } from './shared'
 
@@ -23,6 +24,9 @@ const List = styled.div`
 `
 
 const Item = styled(Link)`
+  /* Takes the remaining width so the boost control sits flush right. */
+  flex: 1;
+  min-width: 0;
   display: flex;
   align-items: center;
   gap: 14px;
@@ -92,6 +96,16 @@ const Reason = styled.div`
   margin-top: 2px;
 `
 
+const RowWrap = styled.div`
+  display: flex;
+  align-items: center;
+  gap: 8px;
+`
+
+const BoostAction = styled.div`
+  flex-shrink: 0;
+`
+
 const TitleSkeleton = styled.div`
   height: 15px;
   width: 55%;
@@ -99,12 +113,21 @@ const TitleSkeleton = styled.div`
   background: #f3f4f6;
 `
 
-function MatchRow({ item, refLabel }: { item: RecommendationItem; refLabel: string }) {
+function MatchRow({
+  item,
+  refLabel,
+  showBoost,
+}: {
+  item: RecommendationItem
+  refLabel: string
+  showBoost?: boolean
+}) {
   const { data: campaign, isLoading } = useCampaign(item.ref_id)
   const title = campaign?.title
   const image = campaign?.image_url
 
   return (
+    <RowWrap>
     <Item href={`/campaigns/${item.ref_id}`}>
       <ScoreBadge $score={item.score}>{Math.round(item.score)}</ScoreBadge>
       <Thumb $src={image || undefined}>{!image && <ImageIcon size={18} />}</Thumb>
@@ -121,6 +144,15 @@ function MatchRow({ item, refLabel }: { item: RecommendationItem; refLabel: stri
       </Body>
       <ArrowUpRight size={18} color="#9ca3af" />
     </Item>
+    {/* Deliberately OUTSIDE the row's Link: a <button> nested in an <a> is
+        invalid markup, and clicking Boost would navigate away instead of
+        boosting. */}
+    {showBoost && (
+      <BoostAction>
+        <BoostButton campaignId={item.ref_id} source="discover" hideCount />
+      </BoostAction>
+    )}
+    </RowWrap>
   )
 }
 
@@ -134,7 +166,13 @@ export function MatchList({
   return (
     <List>
       {items.map((item) => (
-        <MatchRow key={item.ref_id} item={item} refLabel={refLabel} />
+        <MatchRow
+          key={item.ref_id}
+          item={item}
+          refLabel={refLabel}
+          // Cause matches point at categories, not boostable campaigns.
+          showBoost={refLabel === 'campaign'}
+        />
       ))}
     </List>
   )

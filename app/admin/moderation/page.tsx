@@ -2,10 +2,13 @@
 
 import { useState, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
-import { useCampaignQueue, useModerateCampaign } from '@/api/hooks/useAdmin'
+import Link from 'next/link'
+import { useCampaignQueue, useModerateCampaign, useAdminMe } from '@/api/hooks/useAdmin'
 import type { ModerationCampaign } from '@/api/services/adminService'
 import { PageHeader, Loading, ErrorBlock, Empty, Badge, Pagination, ReasonModal, adminStyles as s } from '../_components/ui'
-import { fmtDate, fmtNum } from '../_lib/format'
+import { fmtDate, fmtNum, hasPerm } from '../_lib/format'
+import UpgradeCampaignModal from './UpgradeCampaignModal'
+import SupportBoostsModal from './SupportBoostsModal'
 
 export default function ModerationPage() {
   return (
@@ -29,6 +32,13 @@ function ModerationQueue() {
   const [sort, setSort] = useState('oldest')
   const [page, setPage] = useState(1)
   const [modal, setModal] = useState<{ id: string; decision: 'reject' | 'flag' | 'escalate' } | null>(null)
+  const [upgradeId, setUpgradeId] = useState<string | null>(null)
+  const [boostsId, setBoostsId] = useState<string | null>(null)
+
+  const { data: me } = useAdminMe()
+  // Upgrading is an ACT-level action; a view-only admin must not be offered it.
+  // The server enforces this too — this only keeps the UI honest.
+  const canAct = hasPerm(me?.permissions, 'campaign_moderation:act')
 
   const { data, isLoading, isError } = useCampaignQueue({ status, sort, page, limit: 20 })
   const moderate = useModerateCampaign()
@@ -39,7 +49,15 @@ function ModerationQueue() {
 
   return (
     <div className={s.page}>
-      <PageHeader title="Campaign Moderation Queue" subtitle="Review, approve, flag or reject campaigns" />
+      <PageHeader
+        title="Campaign Moderation Queue"
+        subtitle="Review, approve, flag or reject campaigns"
+        actions={
+          <Link className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} href="/admin/moderation/campaign-upgrades">
+            Upgrade history
+          </Link>
+        }
+      />
 
       <div className={s.toolbar}>
         <select className={s.select} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
@@ -61,7 +79,7 @@ function ModerationQueue() {
             <table className={s.table}>
               <thead>
                 <tr>
-                  <th>Campaign</th><th>Creator</th><th>Review</th><th>Reports</th><th>Risk</th><th>Created</th><th>Actions</th>
+                  <th>Campaign</th><th>Creator</th><th>Type</th><th>Review</th><th>Reports</th><th>Risk</th><th>Created</th><th>Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -75,6 +93,16 @@ function ModerationQueue() {
                       {c.creator_id?.display_name || '—'}
                       <div className={s.muted}>{c.creator_id?.email}</div>
                     </td>
+                    <td>
+                      {c.campaign_type === 'sharing' ? (
+                        <Badge status="approved" label="Share" />
+                      ) : (
+                        <span className={s.muted}>Free</span>
+                      )}
+                      {c.upgrade_meta?.upgrade_initiator_type && (
+                        <div className={s.muted}>via {c.upgrade_meta.upgrade_initiator_type}</div>
+                      )}
+                    </td>
                     <td><Badge status={c.moderation?.review_status} /></td>
                     <td>{fmtNum(c.moderation?.report_count)}</td>
                     <td>{c.moderation?.risk_score != null ? c.moderation.risk_score : '—'}</td>
@@ -85,6 +113,27 @@ function ModerationQueue() {
                         <button className={`${s.btn} ${s.btnDanger} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'reject' })}>Reject</button>
                         <button className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'flag' })}>Flag</button>
                         <button className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'escalate' })}>Escalate</button>
+                        {/* Free → Share Campaign upgrade. Shown for every row;
+                            the modal loads the owner's payout readiness and
+                            disables itself with a reason when blocked. */}
+                        {/* Inspect / revoke community boosts — the only lever
+                            against boost farming. View-only admins can look. */}
+                        <button
+                          className={`${s.btn} ${s.btnGhost} ${s.btnSm}`}
+                          onClick={() => setBoostsId(c._id)}
+                          title="Inspect community boosts on this campaign"
+                        >
+                          Boosts
+                        </button>
+                        {canAct && c.campaign_type !== 'sharing' && (
+                          <button
+                            className={`${s.btn} ${s.btnGhost} ${s.btnSm}`}
+                            onClick={() => setUpgradeId(c._id)}
+                            title="Upgrade this Free Campaign to a Share Campaign"
+                          >
+                            Upgrade
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -95,6 +144,14 @@ function ModerationQueue() {
           <Pagination page={data.pagination.page} totalPages={data.pagination.totalPages} total={data.pagination.total} onChange={setPage} />
         </>
       ))}
+
+      {upgradeId && (
+        <UpgradeCampaignModal campaignId={upgradeId} onClose={() => setUpgradeId(null)} />
+      )}
+
+      {boostsId && (
+        <SupportBoostsModal campaignId={boostsId} onClose={() => setBoostsId(null)} />
+      )}
 
       {modal && (
         <ReasonModal

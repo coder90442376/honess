@@ -15,6 +15,10 @@ const keys = {
   me: ['admin', 'me'] as const,
   roles: ['admin', 'roles'] as const,
   dashboard: (w?: number) => ['admin', 'dashboard', w] as const,
+  campaignUpgradeContext: (id: string) => ['admin', 'campaignUpgradeContext', id] as const,
+  campaignUpgrades: (p: Query) => ['admin', 'campaignUpgrades', p] as const,
+  campaignUpgradeStats: (p: Query) => ['admin', 'campaignUpgradeStats', p] as const,
+  supportBoosts: (id: string, p: Query) => ['admin', 'supportBoosts', id, p] as const,
   timeseries: (d?: number) => ['admin', 'timeseries', d] as const,
   analytics: (p?: string) => ['admin', 'analytics', p] as const,
   analyticsRegions: (p: Query) => ['admin', 'analyticsRegions', p] as const,
@@ -81,6 +85,91 @@ export const useModerateCampaign = () => {
     onSuccess: () => {
       toast.success('Decision applied')
       qc.invalidateQueries({ queryKey: ['admin', 'campaignQueue'] })
+    },
+    onError: onErr,
+  })
+}
+
+/**
+ * Upgrade funnel + boost analytics. `payout_gate_block_rate` is the number the
+ * rollout decision hangs on — how many creators the payout gate turns away.
+ */
+export const useCampaignUpgradeStats = (params: Query, enabled = true) =>
+  useQuery({
+    queryKey: keys.campaignUpgradeStats(params),
+    queryFn: () => adminService.campaignUpgradeStats(params),
+    enabled,
+    retry: false,
+  })
+
+/** Community (peer) boosts on one campaign — the fraud-inspection view. */
+export const useCampaignSupportBoosts = (campaignId: string | null, params: Query) =>
+  useQuery({
+    queryKey: keys.supportBoosts(campaignId ?? '', params),
+    queryFn: () => adminService.campaignSupportBoosts(campaignId as string, params),
+    enabled: !!campaignId,
+    retry: false,
+  })
+
+export const useRevokeSupportBoost = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({ boostId, reason }: { boostId: string; reason: string }) =>
+      adminService.revokeSupportBoost(boostId, reason),
+    onSuccess: () => {
+      toast.success('Boost revoked and campaign score recomputed')
+      qc.invalidateQueries({ queryKey: ['admin', 'supportBoosts'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'campaignQueue'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'campaignUpgradeStats'] })
+    },
+    onError: onErr,
+  })
+}
+
+/** Free → Share upgrade audit trail across all campaigns (AD-02). */
+export const useCampaignUpgrades = (params: Query, enabled = true) =>
+  useQuery({
+    queryKey: keys.campaignUpgrades(params),
+    queryFn: () => adminService.campaignUpgrades(params),
+    enabled,
+    placeholderData: keepPreviousData,
+    retry: false,
+  })
+
+/**
+ * Context an admin needs before upgrading a Free Campaign to a Share Campaign:
+ * the owner, their payout readiness, risk signals and any blockers.
+ *
+ * `staleTime: 0` — payout readiness can change while the modal is open (the
+ * owner may add a method), and acting on a stale "not ready" would be wrong.
+ */
+export const useCampaignUpgradeContext = (id: string | null) =>
+  useQuery({
+    queryKey: keys.campaignUpgradeContext(id ?? ''),
+    queryFn: () => adminService.campaignUpgradeContext(id as string),
+    enabled: !!id,
+    staleTime: 0,
+    retry: false,
+  })
+
+export const useAdminUpgradeCampaign = () => {
+  const qc = useQueryClient()
+  return useMutation({
+    mutationFn: ({
+      id,
+      ...body
+    }: {
+      id: string
+      budget: number
+      reward_per_share: number
+      admin_note: string
+      idempotency_key?: string
+    }) => adminService.upgradeCampaign(id, body),
+    onSuccess: () => {
+      toast.success('Campaign upgraded to a Share Campaign')
+      qc.invalidateQueries({ queryKey: ['admin', 'campaignQueue'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'campaignUpgradeContext'] })
+      qc.invalidateQueries({ queryKey: ['admin', 'campaignUpgrades'] })
     },
     onError: onErr,
   })

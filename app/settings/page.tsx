@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, Suspense } from 'react'
 import styled, { keyframes, createGlobalStyle } from 'styled-components'
 import { AlertCircle, CheckCircle2, Loader2, CreditCard, ArrowLeft, Info } from 'lucide-react'
 import { PaymentMethodManager } from '@/components/campaign/PaymentMethodManager'
@@ -13,7 +13,7 @@ import {
   useDeletePaymentMethod,
   useSetPrimaryPaymentMethod,
 } from '@/api/hooks/usePaymentMethods'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 // ─── Fonts & Global ───────────────────────────────────────────────────────────
 
@@ -339,8 +339,37 @@ const StatCard = styled.div`
 
 // ─── Page Component ───────────────────────────────────────────────────────────
 
+/**
+ * useSearchParams() must sit inside a Suspense boundary in the App Router, or
+ * the whole route is forced into client-side rendering at build time. Same
+ * wrapper pattern as the admin moderation page.
+ */
 export default function CreatorSettingsPage() {
+  return (
+    <Suspense fallback={null}>
+      <CreatorSettingsContent />
+    </Suspense>
+  )
+}
+
+function CreatorSettingsContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Callers that send a creator here to unblock themselves (e.g. the Share
+  // Campaign upgrade gate) pass ?returnTo=. Honour it so "Back" returns them to
+  // what they were doing instead of wherever history happens to point.
+  // Only relative in-app paths are accepted — an absolute URL here would be an
+  // open redirect.
+  const rawReturnTo = searchParams.get('returnTo')
+  const returnTo =
+    rawReturnTo && rawReturnTo.startsWith('/') && !rawReturnTo.startsWith('//')
+      ? rawReturnTo
+      : null
+  const goBack = useCallback(() => {
+    if (returnTo) router.push(returnTo)
+    else router.back()
+  }, [returnTo, router])
   const [isModalOpen,   setIsModalOpen]   = useState(false)
   const [editingMethod, setEditingMethod] = useState<PaymentMethod | null>(null)
   const [successMsg,    setSuccessMsg]    = useState<string | null>(null)
@@ -368,10 +397,17 @@ export default function CreatorSettingsPage() {
       flash('success', 'Payment method added successfully.')
       setEditingMethod(null)
       setIsModalOpen(false)
+
+      // The creator was sent here mid-flow (e.g. blocked from upgrading to a
+      // Share Campaign). They have what they came for — return them to it
+      // rather than leaving them on a settings page wondering what happened.
+      if (returnTo) {
+        setTimeout(() => router.push(returnTo), 900)
+      }
     } catch (err: any) {
       flash('error', err?.message || 'Failed to add payment method.')
     }
-  }, [addPaymentMethod])
+  }, [addPaymentMethod, returnTo, router])
 
   const handleEditMethod = useCallback(async (method: PaymentMethod) => {
     if (!editingMethod?.id) return
@@ -415,7 +451,7 @@ export default function CreatorSettingsPage() {
       <Page>
         {/* ── Top bar ── */}
         <TopBar>
-          <BackBtn onClick={() => router.back()} aria-label="Go back">
+          <BackBtn onClick={goBack} aria-label={returnTo ? 'Back to your campaign' : 'Go back'}>
             <ArrowLeft /> Back
           </BackBtn>
           <TopBarTitle>Payment Settings</TopBarTitle>

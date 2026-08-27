@@ -1,7 +1,7 @@
 'use client'
 
 import styled, { css, keyframes } from 'styled-components'
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import Link from 'next/link'
 import { useRouter, usePathname } from 'next/navigation'
@@ -9,6 +9,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { useAuthStore } from '@/store/authStore'
 import Button from '@/components/ui/Button'
 import { NotificationBell } from '@/features/notifications/components/NotificationBell'
+import { useMyUpgradeRequests } from '@/hooks/useCampaignUpgrade'
 import {
   Menu,
   X,
@@ -49,6 +50,7 @@ import {
   HandHeart,
   Inbox,
   Send,
+  ArrowUpCircle,
 } from 'lucide-react'
 
 // ─── Types ─────────────────────────────────────────────────────────────────
@@ -59,7 +61,33 @@ interface NavLink {
   roles?: string[]
   icon?: React.ReactNode
   group?: string
+  /**
+   * Names a live counter to render beside the label. Kept as a key rather than
+   * a number so these arrays stay static data — the count is resolved at render
+   * time from a hook.
+   */
+  badge?: 'upgradeRequests'
 }
+
+/**
+ * Small count pill for a nav item. Zero renders nothing — an empty badge is
+ * visual noise that trains people to ignore the real one.
+ */
+const NavBadge = styled.span`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: auto;
+  padding: 0 5px;
+  border-radius: 9px;
+  background: #F43F5E;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+`
 
 // ─── Nav Link Definitions ───────────────────────────────────────────────────
 
@@ -81,6 +109,17 @@ const authenticatedNavLinks: NavLink[] = [
     icon: <LayoutDashboard size={15} />,
     roles: ['supporter', 'creator', 'admin'],
     group: 'General',
+  },
+  {
+    // Sponsored upgrade requests wait on the owner's decision. Without a
+    // persistent counter here, a request is only ever seen if the owner
+    // happens to open the notification that announced it.
+    label: 'Upgrade Requests',
+    href: '/upgrade-requests',
+    icon: <ArrowUpCircle size={15} />,
+    roles: ['supporter', 'creator', 'admin'],
+    group: 'General',
+    badge: 'upgradeRequests',
   },
   {
     label: 'My Business',
@@ -153,6 +192,7 @@ const adminNavLinks: NavLink[] = [
   { label: 'Dashboard', href: '/admin', icon: <LayoutDashboard size={15} />, roles: ['admin'], group: 'Admin' },
   { label: 'Analytics', href: '/admin/analytics', icon: <LineChart size={15} />, roles: ['admin'], group: 'Admin' },
   { label: 'Campaign Queue', href: '/admin/moderation', icon: <ShieldCheck size={15} />, roles: ['admin'], group: 'Admin' },
+  { label: 'Campaign Upgrades', href: '/admin/moderation/campaign-upgrades', icon: <ArrowUpCircle size={15} />, roles: ['admin'], group: 'Admin' },
   { label: 'Users', href: '/admin/users', icon: <Users size={15} />, roles: ['admin'], group: 'Admin' },
   { label: 'Finance', href: '/admin/finance', icon: <Wallet size={15} />, roles: ['admin'], group: 'Admin' },
   { label: 'Verifications', href: '/admin/verifications', icon: <BadgeCheck size={15} />, roles: ['admin'], group: 'Admin' },
@@ -769,6 +809,12 @@ export default function Navbar() {
   const pathname = usePathname()
   const { isAuthenticated, user, clearAuth } = useAuthStore()
 
+  // Pending sponsored upgrade requests awaiting this owner's decision. Only
+  // fetched when signed in, and failures are silent — a nav badge must never
+  // be able to break the header.
+  const { data: pendingUpgrades } = useMyUpgradeRequests('pending_owner_approval', isAuthenticated)
+  const pendingUpgradeCount = isAuthenticated ? pendingUpgrades?.items?.length ?? 0 : 0
+
   // SSR-safe portal mount
   useEffect(() => { setIsMounted(true) }, [])
 
@@ -832,9 +878,35 @@ export default function Navbar() {
     router.push('/')
   }, [clearAuth, router])
 
+  // Every href the nav can render, used to decide which of several matching
+  // entries is the most specific.
+  const allLinkHrefs = useMemo(
+    () =>
+      [
+        ...publicNavLinks,
+        ...authenticatedNavLinks,
+        ...creatorNavLinks,
+        ...adminNavLinks,
+        ...supporterNavLinks,
+        ...volunteerNavLinks,
+      ].map((l) => l.href),
+    []
+  )
+
+  // Most-specific route wins. A plain prefix match would light up BOTH
+  // "Campaign Queue" (/admin/moderation) and "Campaign Upgrades"
+  // (/admin/moderation/campaign-upgrades) while on the latter, and "Dashboard"
+  // (/admin) on every admin page.
   const isActive = useCallback(
-    (href: string) => pathname === href || pathname?.startsWith(href + '/'),
-    [pathname]
+    (href: string) => {
+      if (!pathname) return false
+      const matches = (h: string) => pathname === h || pathname.startsWith(h + '/')
+      if (!matches(href)) return false
+      return !allLinkHrefs.some(
+        (other) => other !== href && other.startsWith(href + '/') && matches(other)
+      )
+    },
+    [pathname, allLinkHrefs]
   )
 
   const toggleSection = useCallback((section: string) => {
@@ -953,6 +1025,11 @@ export default function Navbar() {
                         >
                           {link.icon}
                           {link.label}
+                          {link.badge === 'upgradeRequests' && pendingUpgradeCount > 0 && (
+                            <NavBadge aria-label={`${pendingUpgradeCount} pending`}>
+                              {pendingUpgradeCount}
+                            </NavBadge>
+                          )}
                         </DropdownItem>
                       ))}
                     </DropdownMenu>
@@ -1132,6 +1209,11 @@ export default function Navbar() {
                                   >
                                     {link.icon}
                                     {link.label}
+                                    {link.badge === 'upgradeRequests' && pendingUpgradeCount > 0 && (
+                                      <NavBadge aria-label={`${pendingUpgradeCount} pending`}>
+                                        {pendingUpgradeCount}
+                                      </NavBadge>
+                                    )}
                                   </DrawerLink>
                                 ))}
                               </DrawerSectionLinks>

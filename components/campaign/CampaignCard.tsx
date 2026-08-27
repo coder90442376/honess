@@ -16,6 +16,8 @@ import {
   ArrowRight,
 } from 'lucide-react'
 import { Campaign } from '@/api/services/campaignService'
+import BoostButton from '@/features/campaigns/boost/BoostButton'
+import type { BoostSource } from '@/services/campaignBoostService'
 import { normalizeImageUrl } from '@/utils/imageUtils'
 import { tk } from '@/styles/dashboardTokens'
 import { MiracleModeBadge } from '@/components/campaign/MiracleModeBadge'
@@ -24,6 +26,15 @@ interface CampaignCardProps {
   campaign: Campaign
   onDonate?: (campaignId: string) => void
   onShare?: (campaignId: string) => void
+  /**
+   * Show the community Boost control alongside "View Details".
+   *
+   * Off by default: this card is reused in places (the creator's own dashboard,
+   * related-campaign strips) where a boost affordance is either meaningless or
+   * actively wrong. Browse and Discover opt in.
+   */
+  showBoost?: boolean
+  boostSource?: BoostSource
 }
 
 // ─── Animations ──────────────────────────────────────────────────────────────
@@ -359,7 +370,7 @@ const fmt = (cents: number) =>
   (cents / 100).toLocaleString('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 })
 
 // ─── Component ─────────────────────────────────────────────────────────────────
-export function CampaignCard({ campaign }: CampaignCardProps) {
+export function CampaignCard({ campaign, showBoost, boostSource = 'discover' }: CampaignCardProps) {
   // SR-1/SR-2: the dollar meter uses the FUNDRAISING goal only (never goals[0],
   // which could be a sharing_reach share-count). Reach is a separate shares meter.
   const goals = (campaign.goals ?? []) as Array<{
@@ -550,6 +561,10 @@ export function CampaignCard({ campaign }: CampaignCardProps) {
           <ViewDetailsBtn href={`/campaigns/${campaign.id}`}>
             View Details <ArrowRight size={15} />
           </ViewDetailsBtn>
+          {/* Renders nothing on your own campaign, or when signed out. */}
+          {showBoost && campaign.id && (
+            <BoostButton campaignId={String(campaign.id)} source={boostSource} hideCount />
+          )}
         </Actions>
       </Body>
     </Card>

@@ -17,6 +17,7 @@ import {
   LineChart,
   Sparkles,
   Building2,
+  ArrowUpCircle,
 } from 'lucide-react'
 import { hasPerm } from '../_lib/format'
 
@@ -32,6 +33,7 @@ const NAV: NavItem[] = [
   { label: 'Dashboard', href: '/admin', icon: <LayoutDashboard size={20} />, permission: 'dashboard:view' },
   { label: 'Analytics', href: '/admin/analytics', icon: <LineChart size={20} />, permission: 'analytics:view' },
   { label: 'Campaign Queue', href: '/admin/moderation', icon: <ShieldCheck size={20} />, permission: 'campaign_moderation:view' },
+  { label: 'Campaign Upgrades', href: '/admin/moderation/campaign-upgrades', icon: <ArrowUpCircle size={20} />, permission: 'campaign_moderation:view' },
   { label: 'Users', href: '/admin/users', icon: <Users size={20} />, permission: 'user:view' },
   { label: 'Finance', href: '/admin/finance', icon: <Wallet size={20} />, permission: 'finance:view' },
   { label: 'Verifications', href: '/admin/verifications', icon: <BadgeCheck size={20} />, permission: 'verification:view' },
@@ -103,7 +105,14 @@ const Item = styled(Link)<{ $active: boolean }>`
 export default function AdminSidebar({ permissions }: { permissions: string[] }) {
   const pathname = usePathname()
   const items = NAV.filter((i) => hasPerm(permissions, i.permission))
-  const isActive = (href: string) => (href === '/admin' ? pathname === '/admin' : pathname.startsWith(href))
+  // `startsWith` alone would highlight "Campaign Queue" while on
+  // /admin/moderation/campaign-upgrades. Deeper routes win, so only the most
+  // specific matching entry is marked active.
+  const isActive = (href: string) => {
+    if (href === '/admin') return pathname === '/admin'
+    if (!pathname.startsWith(href)) return false
+    return !items.some((i) => i.href !== href && i.href.startsWith(href) && pathname.startsWith(i.href))
+  }
 
   return (
     <Sidebar>

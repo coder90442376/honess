@@ -2,7 +2,10 @@ import styled from 'styled-components'
 import { ReactNode } from 'react'
 
 const AuthContainer = styled.div`
-  min-height: calc(100vh - 4rem);
+  /* Full viewport: these routes render without the global header (see
+     app/LayoutHeader.js), so there is no 4rem chrome to subtract — doing so
+     left the card sitting visibly above centre. */
+  min-height: 100vh;
   display: flex;
   align-items: center;
   justify-content: center;

@@ -19,6 +19,16 @@ const Header = styled.header`
   transition: all 300ms ease-in-out;
 `
 
+// Auth screens are deliberately chrome-free. Sign-in / sign-up is a focused,
+// single-purpose task, and the navbar's "Sign in" and "Get started" buttons are
+// actively confusing sitting above a form that already does both.
+const NO_HEADER_ROUTES = [
+  '/login',
+  '/register',
+  '/forgot-password',
+  '/reset-password',
+]
+
 // Routes under app/(app) render their own <Navbar> in that route group's
 // layout. Skipping them here prevents a stacked double navbar.
 const SELF_HEADERED_ROUTES = [
@@ -34,6 +44,10 @@ export default function LayoutHeader() {
 
   // The landing page ships its own full-width marketing header.
   if (pathname === '/') {
+    return null
+  }
+
+  if (NO_HEADER_ROUTES.some((route) => pathname === route || pathname.startsWith(route + '/'))) {
     return null
   }
 

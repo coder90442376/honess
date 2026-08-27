@@ -138,6 +138,13 @@ export interface ModerationCampaign {
   title: string
   status: string
   created_at: string
+  /** 'fundraising' = a Free Campaign, 'sharing' = already a Share Campaign. */
+  campaign_type?: 'fundraising' | 'sharing'
+  upgrade_meta?: {
+    original_campaign_type?: string | null
+    upgraded_at?: string | null
+    upgrade_initiator_type?: 'creator' | 'sponsor' | 'admin' | null
+  }
   creator_id?: { _id: string; display_name: string; email: string; verified?: boolean; trust_score?: number }
   moderation?: {
     review_status: string
@@ -147,6 +154,124 @@ export interface ModerationCampaign {
     report_count?: number
     risk_score?: number | null
   }
+}
+
+export interface UpgradeBlocker {
+  code: string
+  message: string
+}
+
+/** Context an admin reviews before upgrading a campaign. Carries no payment credentials. */
+export interface CampaignUpgradeContext {
+  campaign: {
+    id: string
+    campaign_id: string
+    title: string
+    status: string
+    campaign_type: string
+    original_campaign_type: string | null
+    created_at: string
+    review_status: string | null
+  }
+  owner: {
+    id: string
+    display_name: string
+    email: string
+    created_at: string
+    blocked: boolean
+    identity_verified: boolean
+    trust_score: number | null
+  } | null
+  payout_readiness: {
+    ready: boolean
+    level: 'verified' | 'provisional' | 'none'
+    method: { id: string; type: string; last_four: string | null } | null
+    reason: string | null
+  }
+  risk: { risk_score: number | null; report_count: number }
+  blockers: UpgradeBlocker[]
+  can_upgrade: boolean
+  upgrade_history: CampaignUpgradeRecord[]
+}
+
+export interface CampaignUpgradeRecord {
+  _id: string
+  campaign_ref: string | null
+  campaign_title: string | null
+  owner_id?: { _id: string; display_name?: string; email?: string } | string
+  initiated_by?: { _id: string; display_name?: string; email?: string } | string
+  initiator_type: 'creator' | 'sponsor' | 'admin'
+  status: string
+  admin_note: string | null
+  reason: string | null
+  rejection_reason: string | null
+  payout_readiness?: { readiness_level: string }
+  created_at: string
+  completed_at: string | null
+  expires_at: string | null
+}
+
+export interface CampaignUpgradesPage {
+  upgrades: CampaignUpgradeRecord[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
+}
+
+export interface UpgradeFunnel {
+  window: { start: string | null; end: string | null }
+  attempted: number
+  succeeded: number
+  failed: number
+  conversion_rate: number
+  payout_gate_failures: number
+  payout_gate_share_of_failures: number
+  /** Share of ALL attempts turned away by the payout gate. The rollout metric. */
+  payout_gate_block_rate: number
+  failures_by_reason: Array<{ reason_code: string; count: number; payout_gate: boolean }>
+  successes_by_initiator: Array<{ initiator_type: string; count: number }>
+  sponsored: { requested: number; approved: number; rejected: number; approval_rate: number }
+}
+
+export interface BoostAnalytics {
+  window: { start: string | null; end: string | null }
+  counted: number
+  suppressed: number
+  revoked: number
+  total: number
+  suppression_rate: number
+  suppressed_by_reason: Array<{ reason: string; count: number }>
+}
+
+export interface UpgradeStatsResponse {
+  funnel: UpgradeFunnel
+  boosts: BoostAnalytics
+}
+
+export interface SupportBoostRecord {
+  _id: string
+  booster_id?: { _id: string; display_name?: string; email?: string; created_at?: string } | string
+  boost_type: string
+  source: string
+  counts_toward_score: boolean
+  trust_weight: number
+  score_contribution: number
+  suppressed_reason: string | null
+  boost_day: string
+  ip_hash: string | null
+  revoked_at: string | null
+  revoked_reason: string | null
+  created_at: string
+}
+
+export interface SupportBoostsPage {
+  campaign: {
+    id: string
+    campaign_id: string
+    title: string
+    community_boost_score: number
+    community_boost_count: number
+  }
+  boosts: SupportBoostRecord[]
+  pagination: { page: number; limit: number; total: number; totalPages: number }
 }
 
 export interface FlaggedComment {
@@ -420,6 +545,39 @@ export const adminService = {
     apiClient.post(`/admin/moderation/campaigns/${id}/pause`, { reason }).then((r) => r.data.data),
   resumeCampaign: (id: string, reason?: string) =>
     apiClient.post(`/admin/moderation/campaigns/${id}/resume`, { reason }).then((r) => r.data.data),
+
+  // AD-02 Free Campaign → Share Campaign upgrade.
+  // The context call carries the OWNER's payout readiness plus a `blockers`
+  // list, so the UI can disable the action with a reason instead of letting an
+  // admin discover the problem on submit. The server re-checks regardless —
+  // there is no admin override of the payout requirement.
+  campaignUpgradeStats: (params?: Query) =>
+    apiClient
+      .get('/admin/moderation/campaign-upgrades/stats', { params })
+      .then((r) => r.data.data as UpgradeStatsResponse),
+  campaignSupportBoosts: (campaignId: string, params?: Query) =>
+    apiClient
+      .get(`/admin/moderation/campaigns/${campaignId}/support-boosts`, { params })
+      .then((r) => r.data.data as SupportBoostsPage),
+  revokeSupportBoost: (boostId: string, reason: string) =>
+    apiClient
+      .post(`/admin/moderation/support-boosts/${boostId}/revoke`, { reason })
+      .then((r) => r.data.data),
+  campaignUpgrades: (params?: Query) =>
+    apiClient
+      .get('/admin/moderation/campaign-upgrades', { params })
+      .then((r) => r.data.data as CampaignUpgradesPage),
+  campaignUpgradeContext: (id: string) =>
+    apiClient.get(`/admin/moderation/campaigns/${id}/upgrade-context`).then((r) => r.data.data),
+  upgradeCampaign: (
+    id: string,
+    body: {
+      budget: number
+      reward_per_share: number
+      admin_note: string
+      idempotency_key?: string
+    }
+  ) => apiClient.post(`/admin/moderation/campaigns/${id}/upgrade`, body).then((r) => r.data.data),
 
   // AD-08 Content moderation
   flaggedComments: (params?: Query) =>
