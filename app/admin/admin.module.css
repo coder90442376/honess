@@ -226,6 +226,107 @@
 .table tr:last-child td { border-bottom: none; }
 .table tbody tr:hover { background: #F7F5F1; }
 
+/* ── Card mode for narrow screens ──────────────────────────────────────────
+   Opt-in via `.cardTable` on the <table>. A data grid with 8 columns cannot
+   shrink to a phone without either horizontal scrolling (which hides the
+   Actions column — the whole point of the row) or truncation. Below 900px each
+   row becomes a stacked card, with the column name rendered from each cell's
+   `data-label`.
+
+   Deliberately opt-in rather than applied to every `.table`, so admin tables
+   that have not been checked cell-by-cell keep their current behaviour. Any
+   table using this MUST put `data-label` on every <td>. */
+@media (max-width: 900px) {
+  .cardTable,
+  .cardTable tbody,
+  .cardTable tr,
+  .cardTable td {
+    display: block;
+    /* `width: auto`, NOT 100%. A block element already fills its container, and
+       100% is measured BEFORE margins/padding are applied — combined with the
+       card's `margin: 12px` below it pushed each card 12px past the right edge,
+       so the whole card read as right-justified and clipped. */
+    width: auto;
+    box-sizing: border-box;
+  }
+
+  /* Headers are redundant once each cell carries its own label. Hidden
+     accessibly rather than removed, so screen readers keep the association. */
+  .cardTable thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .cardTable tr {
+    border: 1px solid #E2DDD6;
+    border-radius: 12px;
+    margin: 12px;
+    padding: 4px 0;
+    background: #fff;
+  }
+  .cardTable tr:hover { background: #fff; }
+
+  .cardTable td {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 10px 14px;
+    border-bottom: 1px solid #F2EFE9;
+    text-align: right;
+  }
+  .cardTable tr td:last-child { border-bottom: none; }
+
+  .cardTable td::before {
+    content: attr(data-label);
+    flex: 0 0 auto;
+    text-align: left;
+    color: #8C8790;
+    font-family: 'DM Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding-top: 2px;
+  }
+
+  /* The primary cell reads as the card's title, not a labelled field. */
+  .cardTable td[data-label='Campaign'] {
+    display: block;
+    text-align: left;
+    background: #F7F5F1;
+    border-radius: 10px 10px 0 0;
+  }
+  .cardTable td[data-label='Campaign']::before { display: none; }
+
+  /* Actions wrap onto their own full-width row so nothing is cut off. */
+  .cardTable td[data-label='Actions'] {
+    display: block;
+    text-align: left;
+  }
+  .cardTable td[data-label='Actions']::before {
+    display: block;
+    margin-bottom: 8px;
+  }
+  .cardTable td[data-label='Actions'] .row { flex-wrap: wrap; }
+  .cardTable td[data-label='Actions'] .btn { flex: 1 1 auto; }
+
+  /* The wrapper's own scroll/border would fight the cards. */
+  .cardTableWrap {
+    overflow-x: visible;
+    border: none;
+    background: transparent;
+    border-radius: 0;
+  }
+}
+
 /* Badges */
 .badge {
   display: inline-block;

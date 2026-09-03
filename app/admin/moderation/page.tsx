@@ -18,7 +18,26 @@ export default function ModerationPage() {
   )
 }
 
-const STATUSES = ['pending', 'flagged', 'escalated', 'approved', 'rejected', 'all']
+// The VALUES are the stored `moderation.review_status` and must not change —
+// only how they're labelled. "approved" never gated publication, so calling it
+// "Reviewed" describes what it actually records.
+const STATUSES = [
+  { value: 'pending', label: 'Unreviewed' },
+  { value: 'flagged', label: 'Flagged' },
+  { value: 'escalated', label: 'Escalated' },
+  { value: 'approved', label: 'Reviewed' },
+  { value: 'rejected', label: 'Taken down' },
+  { value: 'all', label: 'All statuses' },
+]
+
+/** Same relabelling for the Review column badge. */
+const REVIEW_LABEL: Record<string, string> = {
+  pending: 'Unreviewed',
+  approved: 'Reviewed',
+  rejected: 'Taken down',
+  flagged: 'Flagged',
+  escalated: 'Escalated',
+}
 const SORTS = [
   { value: 'oldest', label: 'Oldest first' },
   { value: 'newest', label: 'Newest first' },
@@ -51,7 +70,7 @@ function ModerationQueue() {
     <div className={s.page}>
       <PageHeader
         title="Campaign Moderation Queue"
-        subtitle="Review, approve, flag or reject campaigns"
+        subtitle="Campaigns are live as soon as their creator activates them — this is for spot-checks and takedowns, not approval"
         actions={
           <Link className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} href="/admin/moderation/campaign-upgrades">
             Upgrade history
@@ -61,7 +80,7 @@ function ModerationQueue() {
 
       <div className={s.toolbar}>
         <select className={s.select} value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
-          {STATUSES.map((st) => <option key={st} value={st}>{st === 'all' ? 'All statuses' : st}</option>)}
+          {STATUSES.map((st) => <option key={st.value} value={st.value}>{st.label}</option>)}
         </select>
         <select className={s.select} value={sort} onChange={(e) => setSort(e.target.value)}>
           {SORTS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
@@ -75,8 +94,11 @@ function ModerationQueue() {
         <Empty text="No campaigns match this filter." />
       ) : (
         <>
-          <div className={s.tableWrap}>
-            <table className={s.table}>
+          {/* Card mode below 900px: an 8-column grid can't shrink to a phone
+              without hiding the Actions column behind a horizontal scroll.
+              Every <td> carries a data-label the CSS renders as its heading. */}
+          <div className={`${s.tableWrap} ${s.cardTableWrap}`}>
+            <table className={`${s.table} ${s.cardTable}`}>
               <thead>
                 <tr>
                   <th>Campaign</th><th>Creator</th><th>Type</th><th>Review</th><th>Reports</th><th>Risk</th><th>Created</th><th>Actions</th>
@@ -85,15 +107,15 @@ function ModerationQueue() {
               <tbody>
                 {data.campaigns.map((c: ModerationCampaign) => (
                   <tr key={c._id}>
-                    <td>
+                    <td data-label="Campaign">
                       <strong>{c.title}</strong>
                       <div className={s.muted}>{c.campaign_id}</div>
                     </td>
-                    <td>
+                    <td data-label="Creator">
                       {c.creator_id?.display_name || '—'}
                       <div className={s.muted}>{c.creator_id?.email}</div>
                     </td>
-                    <td>
+                    <td data-label="Type">
                       {c.campaign_type === 'sharing' ? (
                         <Badge status="approved" label="Share" />
                       ) : (
@@ -103,14 +125,37 @@ function ModerationQueue() {
                         <div className={s.muted}>via {c.upgrade_meta.upgrade_initiator_type}</div>
                       )}
                     </td>
-                    <td><Badge status={c.moderation?.review_status} /></td>
-                    <td>{fmtNum(c.moderation?.report_count)}</td>
-                    <td>{c.moderation?.risk_score != null ? c.moderation.risk_score : '—'}</td>
-                    <td className={s.muted}>{fmtDate(c.created_at)}</td>
-                    <td>
+                    <td data-label="Review">
+                      <Badge
+                        status={c.moderation?.review_status}
+                        label={REVIEW_LABEL[c.moderation?.review_status || 'pending']}
+                      />
+                    </td>
+                    <td data-label="Reports">{fmtNum(c.moderation?.report_count)}</td>
+                    <td data-label="Risk">{c.moderation?.risk_score != null ? c.moderation.risk_score : '—'}</td>
+                    <td data-label="Created" className={s.muted}>{fmtDate(c.created_at)}</td>
+                    <td data-label="Actions">
                       <div className={s.row}>
-                        <button className={`${s.btn} ${s.btnSuccess} ${s.btnSm}`} disabled={moderate.isPending} onClick={() => decide(c._id, 'approve')}>Approve</button>
-                        <button className={`${s.btn} ${s.btnDanger} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'reject' })}>Reject</button>
+                        {/* "Mark reviewed" stamps moderation.review_status and clears
+                            the row from the Unreviewed filter. It does NOT publish —
+                            the campaign is already public. */}
+                        <button
+                          className={`${s.btn} ${s.btnSuccess} ${s.btnSm}`}
+                          disabled={moderate.isPending}
+                          onClick={() => decide(c._id, 'approve')}
+                          title="Record that you've checked this campaign. Does not affect whether it's live."
+                        >
+                          Mark reviewed
+                        </button>
+                        {/* The only action here that removes a campaign from public
+                            view — it sets status AND review_status to 'rejected'. */}
+                        <button
+                          className={`${s.btn} ${s.btnDanger} ${s.btnSm}`}
+                          onClick={() => setModal({ id: c._id, decision: 'reject' })}
+                          title="Remove this campaign from public view"
+                        >
+                          Take down
+                        </button>
                         <button className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'flag' })}>Flag</button>
                         <button className={`${s.btn} ${s.btnGhost} ${s.btnSm}`} onClick={() => setModal({ id: c._id, decision: 'escalate' })}>Escalate</button>
                         {/* Free → Share Campaign upgrade. Shown for every row;
@@ -155,11 +200,19 @@ function ModerationQueue() {
 
       {modal && (
         <ReasonModal
-          title={modal.decision === 'reject' ? 'Reject campaign' : modal.decision === 'flag' ? 'Flag campaign' : 'Escalate campaign'}
-          label={modal.decision === 'reject' ? 'Rejection reason (required)' : 'Reason / notes'}
+          title={modal.decision === 'reject' ? 'Take down campaign' : modal.decision === 'flag' ? 'Flag campaign' : 'Escalate campaign'}
+          label={
+            modal.decision === 'reject'
+              ? 'Why is this being taken down? (required — shown in the audit log)'
+              : 'Reason / notes'
+          }
           required={modal.decision === 'reject'}
           danger={modal.decision === 'reject'}
-          confirmLabel={modal.decision.charAt(0).toUpperCase() + modal.decision.slice(1)}
+          confirmLabel={
+            modal.decision === 'reject'
+              ? 'Take down'
+              : modal.decision.charAt(0).toUpperCase() + modal.decision.slice(1)
+          }
           onConfirm={(reason) => decide(modal.id, modal.decision, reason)}
           onClose={() => setModal(null)}
         />

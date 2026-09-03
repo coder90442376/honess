@@ -190,6 +190,8 @@ export interface CampaignUpgradeContext {
   }
   risk: { risk_score: number | null; report_count: number }
   blockers: UpgradeBlocker[]
+  /** Non-blocking advisories, e.g. the owner has no payout method yet. */
+  warnings: UpgradeBlocker[]
   can_upgrade: boolean
   upgrade_history: CampaignUpgradeRecord[]
 }

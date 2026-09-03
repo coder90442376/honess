@@ -250,8 +250,10 @@ function CampaignUpgradesTable() {
           <Empty text="No upgrades match this filter." />
         ) : (
           <>
-            <div className={s.tableWrap}>
-              <table className={s.table}>
+            {/* Same card-mode treatment as the moderation queue — 7 columns
+                cannot shrink to a phone without a horizontal scroll. */}
+            <div className={`${s.tableWrap} ${s.cardTableWrap}`}>
+              <table className={`${s.table} ${s.cardTable}`}>
                 <thead>
                   <tr>
                     <th>Campaign</th>
@@ -266,7 +268,7 @@ function CampaignUpgradesTable() {
                 <tbody>
                   {data.upgrades.map((u) => (
                     <tr key={u._id}>
-                      <td>
+                      <td data-label="Campaign">
                         {u.campaign_ref ? (
                           <Link href={`/campaigns/${u.campaign_ref}`} target="_blank">
                             <strong>{u.campaign_title || u.campaign_ref}</strong>
@@ -276,15 +278,15 @@ function CampaignUpgradesTable() {
                         )}
                         <div className={s.muted}>{u.campaign_ref}</div>
                       </td>
-                      <td>
+                      <td data-label="Owner">
                         {actorName(u.owner_id)}
                         <div className={s.muted}>{actorEmail(u.owner_id)}</div>
                       </td>
-                      <td>
+                      <td data-label="Initiated by">
                         {actorName(u.initiated_by)}
                         <div className={s.muted}>{u.initiator_type}</div>
                       </td>
-                      <td>
+                      <td data-label="Status">
                         <Badge
                           status={BADGE_STATUS[u.status] || 'pending'}
                           label={STATUS_LABEL[u.status] || u.status}
@@ -293,11 +295,11 @@ function CampaignUpgradesTable() {
                           <div className={s.muted}>Expires {fmtDate(u.expires_at)}</div>
                         )}
                       </td>
-                      <td className={s.muted}>{u.payout_readiness?.readiness_level || '—'}</td>
-                      <td className={s.muted}>
+                      <td data-label="Payout at decision" className={s.muted}>{u.payout_readiness?.readiness_level || '—'}</td>
+                      <td data-label="Note / reason" className={s.muted}>
                         {u.admin_note || u.rejection_reason || u.reason || '—'}
                       </td>
-                      <td className={s.muted}>
+                      <td data-label="When" className={s.muted}>
                         {fmtDate(u.created_at)}
                         {u.completed_at && <div>Done {fmtDate(u.completed_at)}</div>}
                       </td>

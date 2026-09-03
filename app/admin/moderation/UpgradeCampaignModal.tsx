@@ -4,20 +4,20 @@
  * Admin: upgrade a Free Campaign to a Share Campaign.
  *
  * The modal loads its own context so the admin sees who owns the campaign,
- * whether that owner can actually be paid, and every blocker BEFORE acting —
- * rather than discovering a refusal on submit.
+ * whether that owner can be paid yet, and every blocker BEFORE acting — rather
+ * than discovering a refusal on submit.
  *
  * Two rules this UI has to make visible, because they surprise people:
  *
- *  1. There is no admin override of the payout requirement. If the OWNER has no
- *     usable payout method, the action is disabled. Upgrading anyway would
- *     create a Share Campaign whose owner cannot pay the sharers it promises —
- *     the exact broken state this feature exists to prevent, except with
- *     HonestNeed's own fingerprints on it.
- *
- *  2. The upgrade does NOT switch paid sharing on. Only the owner can accept
+ *  1. The upgrade does NOT switch paid sharing on. Only the owner can accept
  *     the obligation to pay sharers directly, so the campaign becomes a Share
  *     Campaign with sharing paused and the owner is notified to review it.
+ *
+ *  2. Because nothing can be owed while sharing is off, the owner's payout
+ *     method does NOT block this action — it shows as a warning. An admin can
+ *     help any creator regardless. The payout requirement is enforced at the
+ *     moment that actually matters: when rewards are switched on
+ *     (ShareConfigService.enablePaidSharing).
  *
  * The admin note is mandatory (min 10 chars, enforced server-side too) because
  * it lands in the audit trail.
@@ -44,7 +44,7 @@ const READINESS_LABEL: Record<string, string> = {
 /** Server error codes worth explaining in the admin's own terms. */
 const CODE_HELP: Record<string, string> = {
   OWNER_PAYOUT_NOT_READY:
-    'The owner has no usable payout method. There is no override for this — ask them to add one first.',
+    'The owner has no usable payout method yet. Rewards stay off until they add one.',
   ALREADY_SHARE_CAMPAIGN: 'This campaign has already been upgraded.',
   CAMPAIGN_STATUS_INELIGIBLE: 'This campaign is in a status that cannot be upgraded.',
   CAMPAIGN_NOT_ELIGIBLE: 'This campaign is not eligible — it may be under review.',
@@ -173,9 +173,9 @@ export default function UpgradeCampaignModal({
             <strong>{ctx?.campaign.title}</strong> is now a Share Campaign.
           </p>
           <p className={s.muted}>
-            Paid sharing is <strong>off</strong> until the owner accepts the agreement to pay
-            sharers directly. They have been notified to review and activate it. This action is
-            recorded in the audit log.
+            Paid sharing is <strong>off</strong> until the owner adds a payout method and accepts
+            the agreement to pay sharers directly. They have been notified with both steps. This
+            action is recorded in the audit log.
           </p>
           <div className={s.modalActions}>
             <button className={`${s.btn} ${s.btnPrimary}`} onClick={onClose} autoFocus>
@@ -310,16 +310,27 @@ export default function UpgradeCampaignModal({
                 <ErrorBlock
                   message={`Cannot upgrade: ${ctx.blockers.map((b) => b.message).join(' ')}`}
                 />
-                {ctx.blockers.some((b) => b.code === 'OWNER_PAYOUT_NOT_READY') && (
-                  <p className={s.muted}>{CODE_HELP.OWNER_PAYOUT_NOT_READY}</p>
-                )}
+              </div>
+            )}
+
+            {/* A missing owner payout method is a WARNING, not a blocker. The
+                upgrade leaves paid sharing off, so nothing can be owed yet; the
+                payout requirement is enforced when rewards are switched on. */}
+            {ctx.warnings?.length > 0 && (
+              <div role="status" style={{ marginBottom: 16 }}>
+                {ctx.warnings.map((w) => (
+                  <p key={w.code} className={s.muted}>
+                    ⚠️ {w.message}
+                  </p>
+                ))}
               </div>
             )}
 
             {ctx.can_upgrade && (
               <p className={s.muted} style={{ marginBottom: 16 }}>
-                Paid sharing will stay <strong>off</strong> until the owner accepts the agreement to
-                pay sharers directly. They&apos;ll be notified to review and activate it.
+                Paid sharing will stay <strong>off</strong> until the owner adds a payout method and
+                accepts the agreement to pay sharers directly. They&apos;ll be notified with both
+                steps.
               </p>
             )}
 
