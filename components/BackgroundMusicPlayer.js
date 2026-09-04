@@ -95,7 +95,9 @@ export default function BackgroundMusicPlayer() {
     <>
       <audio
         ref={audioRef}
-        src="https://res.cloudinary.com/dctvil2gu/video/upload/v1779613243/I_CAN_DO_ALL_THINGS_THROUGH_CHRIST_V2_qakp1g.mp3"
+        // Served from Cloudinary rather than /public: the track is ~10MB and
+        // every visitor would otherwise pull it from the app server.
+        src="https://res.cloudinary.com/dctvil2gu/video/upload/v1788547765/honestneed-background-music-v3.mp3"
         loop
         autoPlay
         muted
