@@ -180,10 +180,21 @@ class AuthService {
     error?: string
   }> {
     try {
+      // The API requires resetUrl as well as email — it builds the link in the
+      // email from it, and rejects the request outright without it. Omitting it
+      // made every password reset fail validation, so a user who forgot their
+      // password had no way back into their account.
       const response = await apiClient.post<{ message: string }>(
         '/auth/request-password-reset',
         {
           email: email.toLowerCase(),
+          // The ORIGIN only. The API appends `/reset-password?token=…` itself
+          // (utils/emailService.js builds the link), so including the path here
+          // would produce /reset-password/reset-password and a dead link.
+          resetUrl:
+            typeof window !== 'undefined'
+              ? window.location.origin
+              : process.env.NEXT_PUBLIC_SITE_URL || 'https://honestneed.com',
         }
       )
 

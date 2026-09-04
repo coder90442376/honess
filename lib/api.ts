@@ -377,12 +377,16 @@ function handleApiError(error: AxiosError<ApiErrorResponse>): void {
     toast.error('You do not have permission to perform this action.')
   } else if (error.response?.status === 404) {
     // Not found
-    const message = error.response?.data?.message || 'Resource not found'
-    toast.error(message)
-  } else if (error.response?.status === 400) {
-    // Bad request - validation errors
-    const message = error.response?.data?.message || error.response?.data?.error || 'Invalid request'
-    toast.error(message)
+    toast.error(getApiErrorMessage(error, 'Resource not found'))
+  } else if (error.response?.status === 400 || error.response?.status === 422) {
+    // Bad request / unprocessable - validation errors
+    toast.error(getApiErrorMessage(error, 'Invalid request'))
+  } else if (error.response?.status === 409) {
+    // Conflict. The server's message is the ONLY thing that tells the user what
+    // to do — "A user with this email already exists" means sign in or reset,
+    // not "try again". Without this branch a 409 fell through to the generic
+    // toast, so people retried a registration that could never succeed.
+    toast.error(getApiErrorMessage(error, 'That already exists.'))
   } else if (error.response?.status && error.response.status >= 500) {
     // Server error — the global ConnectivityBanner already explains this and
     // offers a Retry action; a toast on top would just be noise.
